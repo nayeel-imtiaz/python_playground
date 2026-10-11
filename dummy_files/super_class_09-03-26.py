@@ -11,8 +11,13 @@ class Lexus(Vehicle):
         return f"{self.name} {self.lexus}"
 
 def main():
-    l = Lexus("ES300")
-    print(l)
+    try:
+        l = Lexus("ES300")
+        print(l)
+    except AttributeError as e:
+        print(e)
+    finally:
+        print(dir(l))
 
 
 if __name__ == "__main__":
