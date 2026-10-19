@@ -50,20 +50,31 @@ Reflection:
 """
 
 from dataclasses import dataclass
+from enum import Enum, auto
+
+
+class LibrarySystemCodes(Enum):
+    NEW_BOOK_ADDED = auto()
+    MORE_COPIES_ADDED = auto()
+    NEW_MEMBER_ADDED = auto()
+    MEMBER_ALREADY_EXISTS = auto()
+    BORROW_SUCCESSFUL = auto()
+    BORROW_UNSUCCESSFUL = auto()
+    RETURN_SUCCESSFUL = auto()
+    RETURN_UNSUCCESSFUL = auto()
 
 
 @dataclass
 class Book:
-    isbn: int
+    isbn: str
     title: str
     author: str
 
 
 @dataclass
 class Member:
-    id: int
+    member_id: str
     name: str
-    books: set[int]
 
 
 class Library:
@@ -71,39 +82,82 @@ class Library:
         self.books = {}
         self.members = {}
 
-    def add_book(self, book: Book, number_of_copies: int):
-        if book in self.books:
-            self.books[book] += number_of_copies
+    def add_book(self, isbn: str, title: str, author: str, number_of_copies: int) -> LibrarySystemCodes:
+        if isbn in self.books:
+            self.books[isbn][number_of_copies] += number_of_copies
+            return LibrarySystemCodes.MORE_COPIES_ADDED
         else:
-            self.books[book] = number_of_copies
+            self.books[isbn] = {
+                "book": Book(isbn, title, author),
+                "number_of_copies": number_of_copies
+            }
+            return LibrarySystemCodes.NEW_BOOK_ADDED
 
-    def register_member(self, member: Member):
-        if member not in self.members:
-            self.members[member] = 0
+    def register_member(self, member_id: str, name) -> LibrarySystemCodes:
+        if member_id not in self.members:
+            self.members[member_id] = {
+                "member": Member(member_id, name),
+                "has_books": set()
+            }
+            return LibrarySystemCodes.NEW_MEMBER_ADDED
+        else:
+            return LibrarySystemCodes.MEMBER_ALREADY_EXISTS
 
-    def borrow_book(self, member: Member, book: Book) -> bool:
-        if not self.check_book_availability(book):
-            return False
-        member.books.add(book.isbn)
-        self.books[book] -= 1
-        return True
+    def borrow_book(self, member_id: str, isbn: str) -> LibrarySystemCodes:
+        if (
+            isbn in self.books and self.books[isbn]["number_of_copies"] > 0
+            and member_id in self.members
+            and len(self.members[member_id]["has_books"]) <= 3
+        ):
+            self.books[isbn]["number_of_copies"] -= 1
+            self.members[member_id]["has_books"].add(isbn)
+            return LibrarySystemCodes.BORROW_SUCCESSFUL
+        else:
+            return LibrarySystemCodes.BORROW_UNSUCCESSFUL
 
-    def return_book(self, member: Member, book: Book):
-        if book.isbn not in member.books:
-            return False
-        member.books.discard(book.isbn)
-        self.books[book] += 1
-        return True
+    def return_book(self, member_id: str, isbn: str) -> LibrarySystemCodes:
+        if (
+            member_id in self.members
+            and isbn in self.books
+        ):
+            self.members[member_id]["has_books"].discard(isbn)
+            self.books[isbn]["number_of_copies"] += 1
+            return LibrarySystemCodes.RETURN_SUCCESSFUL
+        else:
+            return LibrarySystemCodes.RETURN_UNSUCCESSFUL
 
 
-    def check_book_availability(self, book: Book) -> bool:
-        if book in self.books and self.books[book] > 0:
-            return True
-        return False
+    def available_copies(self, isbn: str) -> LibrarySystemCodes:
+        if isbn in self.books:
+            return self.books[isbn]["number_of_copies"]
+        else:
+            return 0
 
 
 def main():
-    pass
+    library = Library()
+
+    print("Add 2 copies of Clean Code by Robert Martin.")
+    print(library.add_book("978-123", "Clean Code", "Robert Martin", 2))
+    print()
+
+    print("Add 2 Members: Alice and Bob.")
+    print(library.register_member("M1", "Alice"))
+    print(library.register_member("M2", "Bob"))
+    print()
+
+    print("M1 and M2 borrows separate copies of same book:")
+    print(library.borrow_book("M1", "978-123"))
+    print(library.borrow_book("M2", "978-123"))
+    print()
+
+    assert library.available_copies("978-123") == 0
+
+    print("M1 returns \"Clean Code\"")
+    print(library.return_book("M1", "978-123"))
+    print()
+
+    assert library.available_copies("978-123") == 1
 
 
 if __name__ == '__main__':
