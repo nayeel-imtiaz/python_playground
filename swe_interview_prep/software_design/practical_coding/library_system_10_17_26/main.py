@@ -72,6 +72,13 @@ class Book:
 
 
 @dataclass
+class BookCopy:
+    copy_id: int
+    isbn: str
+    borrower_id: str | None = None
+
+
+@dataclass
 class Member:
     member_id: str
     name: str
@@ -79,59 +86,68 @@ class Member:
 
 class Library:
     def __init__(self):
-        self.books = {}
-        self.members = {}
+        self.books: dict[str, Book] = {}
+        self.members: dict[str, Member] = {}
+        self.copies: dict[int, BookCopy] = {}
+        self.next_copy_id = 1
 
-    def add_book(self, isbn: str, title: str, author: str, number_of_copies: int) -> LibrarySystemCodes:
-        if isbn in self.books:
-            self.books[isbn][number_of_copies] += number_of_copies
-            return LibrarySystemCodes.MORE_COPIES_ADDED
+    def add_book(self, isbn: str, title: str, author: str, number_of_copies: int) -> bool:
+        if number_of_copies <= 0:
+            return False
+
+        if isbn not in self.books:
+            self.books[isbn] = Book(isbn, title, author)
+
+        for _ in range(number_of_copies):
+            self.copies[self.next_copy_id] = BookCopy(self.next_copy_id, isbn)
+            self.next_copy_id += 1
+
+        return True
+
+    def register_member(self, member_id: str, name) -> bool:
+        if member_id in self.members:
+            return False
+
         else:
-            self.books[isbn] = {
-                "book": Book(isbn, title, author),
-                "number_of_copies": number_of_copies
-            }
-            return LibrarySystemCodes.NEW_BOOK_ADDED
+            self.members[member_id] = Member(member_id, name)
+            return True
 
-    def register_member(self, member_id: str, name) -> LibrarySystemCodes:
-        if member_id not in self.members:
-            self.members[member_id] = {
-                "member": Member(member_id, name),
-                "has_books": set()
-            }
-            return LibrarySystemCodes.NEW_MEMBER_ADDED
-        else:
-            return LibrarySystemCodes.MEMBER_ALREADY_EXISTS
-
-    def borrow_book(self, member_id: str, isbn: str) -> LibrarySystemCodes:
-        if (
-            isbn in self.books and self.books[isbn]["number_of_copies"] > 0
-            and member_id in self.members
-            and len(self.members[member_id]["has_books"]) <= 3
-        ):
-            self.books[isbn]["number_of_copies"] -= 1
-            self.members[member_id]["has_books"].add(isbn)
-            return LibrarySystemCodes.BORROW_SUCCESSFUL
-        else:
-            return LibrarySystemCodes.BORROW_UNSUCCESSFUL
-
-    def return_book(self, member_id: str, isbn: str) -> LibrarySystemCodes:
+    def borrow_book(self, member_id: str, isbn: str) -> int | None:
         if (
             member_id in self.members
-            and isbn in self.books
+            and self.active_loans(member_id) < 3
         ):
-            self.members[member_id]["has_books"].discard(isbn)
-            self.books[isbn]["number_of_copies"] += 1
-            return LibrarySystemCodes.RETURN_SUCCESSFUL
-        else:
-            return LibrarySystemCodes.RETURN_UNSUCCESSFUL
+            for copy_id, book_copy in self.copies.items():
+                if book_copy.isbn == isbn and book_copy.borrower_id is None:
+                    book_copy.borrower_id = member_id
+                    return copy_id
 
+        return None
 
-    def available_copies(self, isbn: str) -> LibrarySystemCodes:
-        if isbn in self.books:
-            return self.books[isbn]["number_of_copies"]
-        else:
-            return 0
+    def return_book(self, member_id: str, copy_id: int) -> bool:
+        if (
+            member_id in self.members
+            and copy_id in self.copies
+            and self.copies[copy_id].borrower_id == member_id
+        ):
+            self.copies[copy_id].borrower_id = None
+            return True
+
+        return False
+
+    def available_copies(self, isbn: str) -> int:
+        number_of_available_copies = 0
+        for _, book_copy in self.copies.items():
+            if book_copy.isbn == isbn and book_copy.borrower_id is None:
+                number_of_available_copies += 1
+        return number_of_available_copies
+
+    def active_loans(self, member_id: str) -> int:
+        number_of_loans = 0
+        for _, book_copy in self.copies.items():
+            if book_copy.borrower_id and book_copy.borrower_id == member_id:
+                number_of_loans += 1
+        return number_of_loans
 
 
 def main():
@@ -141,23 +157,40 @@ def main():
     print(library.add_book("978-123", "Clean Code", "Robert Martin", 2))
     print()
 
+    print("Add 1 more copy of Clean Code by Robert Martin.")
+    print(library.add_book("978-123", "Clean Code", "Robert Martin", 1))
+    print()
+    assert library.available_copies("978-123") == 3
+
     print("Add 2 Members: Alice and Bob.")
     print(library.register_member("M1", "Alice"))
     print(library.register_member("M2", "Bob"))
     print()
 
     print("M1 and M2 borrows separate copies of same book:")
-    print(library.borrow_book("M1", "978-123"))
-    print(library.borrow_book("M2", "978-123"))
+    copy1 = library.borrow_book("M1", "978-123")
+    copy2 = library.borrow_book("M2", "978-123")
+    print(copy1)
+    print(copy2)
     print()
 
-    assert library.available_copies("978-123") == 0
+    assert copy1 is not None
+    assert copy2 is not None
+    assert copy1 != copy2
 
-    print("M1 returns \"Clean Code\"")
-    print(library.return_book("M1", "978-123"))
-    print()
+    assert library.active_loans("M1") == 1
+    assert library.active_loans("M2") == 1
 
     assert library.available_copies("978-123") == 1
+
+    print("M1 returns \"Clean Code\"")
+    return_copy1 = library.return_book("M1", copy1)
+    print()
+
+    assert return_copy1
+    assert library.available_copies("978-123") == 2
+    assert library.active_loans("M1") == 0
+    assert library.active_loans("M2") == 1
 
 
 if __name__ == '__main__':
