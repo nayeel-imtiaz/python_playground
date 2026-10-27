@@ -33,7 +33,7 @@ class Account:
 
 
 class Bank:
-    def __init__(self):
+    def __init__(self) -> None:
         self.accounts: dict[int, Account] = {}
         self.next_unique_id = 1
 
@@ -74,6 +74,7 @@ class Bank:
             amount <= 0
             or sending_account_id not in self.accounts
             or receiving_account_id not in self.accounts
+            or sending_account_id == receiving_account_id
             or self.accounts[sending_account_id].balance < amount
         ):
             return False
@@ -110,6 +111,12 @@ def main():
     assert bank.check_balance(adam_account) == 50
     assert len(bank.get_transaction_history(jane_account)) == 3
     assert len(bank.get_transaction_history(adam_account)) == 1
+
+    before_balance = bank.check_balance(adam_account)
+    before_transactions_length = len(bank.get_transaction_history(adam_account))
+    assert not bank.transfer(adam_account, adam_account, 10)
+    assert before_balance == bank.check_balance(adam_account)
+    assert before_transactions_length == len(bank.get_transaction_history(adam_account))
 
     print("All tests so far pass.")
 
