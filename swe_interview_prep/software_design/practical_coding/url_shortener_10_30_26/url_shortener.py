@@ -10,8 +10,6 @@ Time limit:
     60 minutes
 """
 
-# 4:56 start code
-from dataclasses import dataclass
 from collections import deque
 
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -32,11 +30,11 @@ class UrlShortener:
 
     def get_long_url(self, short_url: str) -> str:
         if not short_url.startswith("https://short_url.com/"):
-            return "{code: 400, invalid short url format}"
+            return "{Invalid short url format}"
 
-        code = short_url.lstrip("https://short_url.com/")
+        code = short_url.removeprefix("https://short_url.com/")
         if code not in self.code_to_long:
-            return "code: 500, short url does not exist"
+            return "{Short url does not exist}"
         else:
             return self.code_to_long[code]
 
@@ -87,14 +85,14 @@ def test_short_url_end_to_end() -> None:
 
 def test_short_url_errors() -> None:
     url_shortener = UrlShortener()
-    assert url_shortener.get_long_url("www.google.com") == "{code: 400, invalid short url format}"
-    assert url_shortener.get_long_url("https://short_url.com/ew") == "{code: 500, short url does not exist}"
+    assert url_shortener.get_long_url("www.google.com") == "{Invalid short url format}"
+    assert url_shortener.get_long_url("https://short_url.com/ew") == "{Short url does not exist}"
 
 
 def main():
     test_convert_to_base_62()
     test_short_url_end_to_end()
-    # test_long_url()
+    test_short_url_errors()
 
     print("All tests pass.")
 
